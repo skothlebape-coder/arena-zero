@@ -1,0 +1,156 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARENA ZERO</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#080b12;color:white;font-family:Arial,sans-serif;overflow:hidden}
+#game{width:100vw;height:100vh;display:block}
+#hud{position:fixed;inset:0;pointer-events:none}
+.top{display:flex;justify-content:space-between;padding:22px}
+.logo{font-size:24px;font-weight:900;letter-spacing:4px;color:#54f6d0}
+.panel{background:#101b2bd9;padding:12px 18px;border:1px solid #31536b;border-radius:10px}
+#score{font-size:22px;font-weight:bold}
+#event{position:absolute;top:100px;left:50%;transform:translateX(-50%);background:#102b38;padding:12px 22px;border-radius:10px;color:#65ffe0}
+#cross{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:25px;color:white}
+#hint{position:absolute;bottom:25px;left:50%;transform:translateX(-50%);background:#101b2bd9;padding:12px 20px;border-radius:10px;text-align:center;white-space:nowrap}
+#start{position:fixed;inset:0;background:#080b12eF;display:flex;align-items:center;justify-content:center;text-align:center;z-index:5}
+#start button{background:#50f5ce;color:#061015;border:0;padding:16px 38px;border-radius:8px;font-size:18px;font-weight:bold;cursor:pointer}
+#start h1{font-size:48px;letter-spacing:7px;color:#50f5ce}
+small{color:#9eb5c5}
+</style>
+</head>
+<body>
+<div id="start">
+ <div>
+  <h1>ARENA ZERO</h1>
+  <p>CHAOS CORE · PROTOTYPE 0.1</p>
+  <p><small>WASD — движение · SPACE — прыжок · мышь — обзор</small></p>
+  <button id="play">НАЧАТЬ ИГРУ</button>
+ </div>
+</div>
+<canvas id="game"></canvas>
+<div id="hud">
+ <div class="top">
+  <div class="logo">ARENA ZERO</div>
+  <div class="panel">ВРЕМЯ <b id="time">04:00</b></div>
+  <div class="panel">СЧЁТ <span id="score">0</span></div>
+ </div>
+ <div id="event">АРЕНА СТАБИЛЬНА</div>
+ <div id="cross">+</div>
+ <div id="hint">WASD — движение · SPACE — прыжок · Собирай ядра</div>
+</div>
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=innerWidth;H=canvas.height=innerHeight}
+addEventListener('resize',resize);resize();
+
+let player={x:0,y:0,z:0,vx:0,vy:0,vz:0,angle:0};
+let keys={},score=0,time=240,started=false,ended=false;
+let cores=[],eventName='АРЕНА СТАБИЛЬНА',eventTimer=0;
+let gravity=1,speed=1;
+for(let i=0;i<18;i++)cores.push({x:(Math.random()-.5)*30,z:5+Math.random()*35,taken:false});
+
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault()});
+addEventListener('keyup',e=>keys[e.code]=false);
+canvas.addEventListener('click',()=>{if(started&&!ended)canvas.requestPointerLock()});
+addEventListener('mousemove',e=>{
+ if(document.pointerLockElement===canvas)player.angle+=e.movementX*.002;
+});
+function start(){
+ document.getElementById('start').style.display='none';
+ started=true;last=performance.now();
+ canvas.requestPointerLock();
+ requestAnimationFrame(loop);
+}
+document.getElementById('play').onclick=start;
+
+let last=0;
+function loop(now){
+ if(!started||ended)return;
+ let dt=Math.min((now-last)/1000,.04);last=now;
+ update(dt);render();
+ requestAnimationFrame(loop);
+}
+function update(dt){
+ let forward=(keys.KeyW?1:0)-(keys.KeyS?1:0);
+ let side=(keys.KeyD?1:0)-(keys.KeyA?1:0);
+ let a=player.angle;
+ let dx=Math.sin(a)*forward+Math.cos(a)*side;
+ let dz=Math.cos(a)*forward-Math.sin(a)*side;
+ let len=Math.hypot(dx,dz)||1;
+ player.x+=dx/len*12*speed*dt;
+ player.z+=dz/len*12*speed*dt;
+ player.x=Math.max(-22,Math.min(22,player.x));
+ player.z=Math.max(-5,Math.min(48,player.z));
+ player.vy-=24*gravity*dt;
+ player.y+=player.vy*dt;
+ if(player.y<0){player.y=0;player.vy=0}
+ if(keys.Space&&player.y===0)player.vy=10;
+ cores.forEach(c=>{
+ if(!c.taken&&Math.hypot(c.x-player.x,c.z-player.z)<1.5){c.taken=true;score+=10;document.getElementById('score').textContent=score}
+ });
+ if(cores.every(c=>c.taken)){
+ for(let i=0;i<18;i++)cores.push({x:(Math.random()-.5)*30,z:5+Math.random()*35,taken:false});
+ }
+ time-=dt;
+ document.getElementById('time').textContent=
+ '0'+Math.floor(time/60)+':'+String(Math.max(0,Math.ceil(time%60))).padStart(2,'0');
+ eventTimer-=dt;
+ if(eventTimer<=0){
+ eventTimer=30;
+ let n=Math.floor(Math.random()*3);
+ gravity=n===0?.45:1;
+ speed=n===1?1.6:1;
+ eventName=['НИЗКАЯ ГРАВИТАЦИЯ','SPEED RUSH','АРЕНА СТАБИЛЬНА'][n];
+ document.getElementById('event').textContent=eventName;
+ }
+ if(time<=0){ended=true;document.getElementById('hint').textContent='МАТЧ ОКОНЧЕН · СЧЁТ '+score;document.exitPointerLock()}
+}
+function render(){
+ ctx.fillStyle='#111d30';ctx.fillRect(0,0,W,H);
+ let horizon=H*.43-player.y*18;
+ let sky=ctx.createLinearGradient(0,0,0,horizon);
+ sky.addColorStop(0,'#080c1b');sky.addColorStop(1,'#19354c');
+ ctx.fillStyle=sky;ctx.fillRect(0,0,W,horizon);
+ ctx.fillStyle='#101a2a';ctx.fillRect(0,horizon,W,H-horizon);
+ let fov=canvas.width*.8;
+ function project(x,z){
+ let dx=x-player.x,dz=z-player.z;
+ let a=player.angle;
+ let rx=dx*Math.cos(a)-dz*Math.sin(a);
+ let rz=dx*Math.sin(a)+dz*Math.cos(a);
+ if(rz<.2)return null;
+ return {x:W/2+rx*fov/rz,y:horizon+fov*1.2/rz,scale:fov/rz};
+ }
+ // floor grid
+ ctx.strokeStyle='#24475a';ctx.lineWidth=1;
+ for(let z=2;z<55;z+=2){
+ let p1=project(-25,z),p2=project(25,z);
+ if(p1&&p2){ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke()}
+ }
+ for(let x=-24;x<=24;x+=3){
+ let p1=project(x,2),p2=project(x,55);
+ if(p1&&p2){ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke()}
+ }
+ // arena walls
+ for(let x of [-24,24]){
+ let p=project(x,25);
+ if(p){ctx.fillStyle='#173d51';ctx.fillRect(p.x-3*p.scale,p.y-15*p.scale,6*p.scale,30*p.scale)}
+ }
+ // cores
+ cores.filter(c=>!c.taken).sort((a,b)=>b.z-a.z).forEach(c=>{
+ let p=project(c.x,c.z);if(!p||p.scale>900)return;
+ let r=Math.max(3,p.scale*.13);
+ ctx.save();ctx.shadowBlur=25;ctx.shadowColor='#55ffe0';ctx.fillStyle='#65ffe0';
+ ctx.beginPath();ctx.arc(p.x,p.y-r*2,r,0,Math.PI*2);ctx.fill();ctx.restore();
+ });
+}
+</script>
+</body>
+</html>
