@@ -3,154 +3,370 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ARENA ZERO</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARENA ZERO 0.2</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#080b12;color:white;font-family:Arial,sans-serif;overflow:hidden}
-#game{width:100vw;height:100vh;display:block}
+body{margin:0;overflow:hidden;background:#101820;color:white;font-family:Arial}
+canvas{display:block}
 #hud{position:fixed;inset:0;pointer-events:none}
-.top{display:flex;justify-content:space-between;padding:22px}
-.logo{font-size:24px;font-weight:900;letter-spacing:4px;color:#54f6d0}
-.panel{background:#101b2bd9;padding:12px 18px;border:1px solid #31536b;border-radius:10px}
-#score{font-size:22px;font-weight:bold}
-#event{position:absolute;top:100px;left:50%;transform:translateX(-50%);background:#102b38;padding:12px 22px;border-radius:10px;color:#65ffe0}
-#cross{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:25px;color:white}
-#hint{position:absolute;bottom:25px;left:50%;transform:translateX(-50%);background:#101b2bd9;padding:12px 20px;border-radius:10px;text-align:center;white-space:nowrap}
-#start{position:fixed;inset:0;background:#080b12eF;display:flex;align-items:center;justify-content:center;text-align:center;z-index:5}
-#start button{background:#50f5ce;color:#061015;border:0;padding:16px 38px;border-radius:8px;font-size:18px;font-weight:bold;cursor:pointer}
-#start h1{font-size:48px;letter-spacing:7px;color:#50f5ce}
-small{color:#9eb5c5}
+.top{display:flex;justify-content:space-between;padding:20px}
+.logo{font-size:25px;font-weight:900;letter-spacing:4px;color:#7df5e5;text-shadow:0 0 15px #26cbb9}
+.panel{background:#101923c9;border:1px solid #ffffff30;border-radius:9px;padding:12px 17px}
+#cross{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:27px;color:white;text-shadow:0 0 8px #60ffe5}
+#bottom{position:absolute;bottom:20px;left:20px;background:#101923c9;padding:13px 18px;border-radius:9px}
+#hint{position:absolute;bottom:22px;right:20px;background:#101923c9;padding:13px;border-radius:9px}
+#event{position:absolute;top:95px;left:50%;transform:translateX(-50%);color:#baf9e9;background:#102c32c9;padding:10px 20px;border-radius:8px}
+#start{position:fixed;inset:0;z-index:10;background:linear-gradient(#101923bb,#080d16ee);display:grid;place-items:center;text-align:center}
+#start h1{font-size:clamp(38px,8vw,76px);letter-spacing:9px;color:#76ffe5;margin:0}
+#start button{padding:16px 35px;background:#72f5dc;border:0;border-radius:8px;font-size:18px;font-weight:bold;cursor:pointer}
+#start p{color:#c2d4d9}
+#message{font-size:14px;color:#80ffe8}
 </style>
 </head>
 <body>
+
 <div id="start">
  <div>
   <h1>ARENA ZERO</h1>
-  <p>CHAOS CORE · PROTOTYPE 0.1</p>
-  <p><small>WASD — движение · SPACE — прыжок · мышь — обзор</small></p>
-  <button id="play">НАЧАТЬ ИГРУ</button>
+  <p>DESERT OUTPOST · PROTOTYPE 0.2</p>
+  <p>Пустынная база · Свободное перемещение · Энергетические испытания</p>
+  <button id="play">ВОЙТИ НА АРЕНУ</button>
+  <p id="message">WASD — движение · SPACE — прыжок · SHIFT — бег · ЛКМ — энергетический импульс</p>
  </div>
 </div>
-<canvas id="game"></canvas>
+
 <div id="hud">
  <div class="top">
   <div class="logo">ARENA ZERO</div>
-  <div class="panel">ВРЕМЯ <b id="time">04:00</b></div>
-  <div class="panel">СЧЁТ <span id="score">0</span></div>
+  <div class="panel">DESERT OUTPOST</div>
+  <div class="panel">ОЧКИ: <b id="score">0</b></div>
  </div>
- <div id="event">АРЕНА СТАБИЛЬНА</div>
+ <div id="event">DESERT ZONE · ACTIVE</div>
  <div id="cross">+</div>
- <div id="hint">WASD — движение · SPACE — прыжок · Собирай ядра</div>
+ <div id="bottom">ЭНЕРГИЯ: <b id="energy">100</b></div>
+ <div id="hint">WASD — движение<br>SPACE — прыжок<br>SHIFT — бег<br>ЛКМ — импульс<br>ESC — меню мыши</div>
 </div>
-<script>
-const canvas=document.getElementById('game');
-const ctx=canvas.getContext('2d');
-let W,H;
-function resize(){W=canvas.width=innerWidth;H=canvas.height=innerHeight}
-addEventListener('resize',resize);resize();
 
-let player={x:0,y:0,z:0,vx:0,vy:0,vz:0,angle:0};
-let keys={},score=0,time=240,started=false,ended=false;
-let cores=[],eventName='АРЕНА СТАБИЛЬНА',eventTimer=0;
-let gravity=1,speed=1;
-for(let i=0;i<18;i++)cores.push({x:(Math.random()-.5)*30,z:5+Math.random()*35,taken:false});
+<script type="importmap">
+{
+ "imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+ }
+}
+</script>
 
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault()});
-addEventListener('keyup',e=>keys[e.code]=false);
-canvas.addEventListener('click',()=>{if(started&&!ended)canvas.requestPointerLock()});
-addEventListener('mousemove',e=>{
- if(document.pointerLockElement===canvas)player.angle+=e.movementX*.002;
+<script type="module">
+import * as THREE from 'three';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8cb6d1);
+scene.fog = new THREE.Fog(0xb7b5a1,55,190);
+
+const camera = new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,300);
+camera.rotation.order='YXZ';
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xc6e5ff,0x806044,2));
+
+const sun=new THREE.DirectionalLight(0xffe1b0,3);
+sun.position.set(-45,75,-35);
+sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+scene.add(sun);
+
+function material(color,roughness=1){
+ return new THREE.MeshStandardMaterial({color,roughness});
+}
+
+const sand=material(0xc3a16e);
+const rock=material(0x776b5a);
+const concrete=material(0x747d80);
+const dark=material(0x303b40);
+const metal=material(0x4c5b61);
+const orange=material(0xc17d43);
+
+function heightAt(x,z){
+ return Math.sin(x*.035)*1.1+Math.cos(z*.045)*1.2+
+ Math.sin((x+z)*.025)*.7;
+}
+
+const groundGeo=new THREE.PlaneGeometry(220,220,100,100);
+groundGeo.rotateX(-Math.PI/2);
+const pos=groundGeo.attributes.position;
+for(let i=0;i<pos.count;i++){
+ const x=pos.getX(i),z=pos.getZ(i);
+ pos.setY(i,heightAt(x,z));
+}
+groundGeo.computeVertexNormals();
+const ground=new THREE.Mesh(groundGeo,sand);
+ground.receiveShadow=true;
+scene.add(ground);
+
+function box(x,y,z,w,h,d,mat){
+ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+ m.position.set(x,y,z);
+ m.castShadow=true;
+ m.receiveShadow=true;
+ scene.add(m);
+ return m;
+}
+
+function cylinder(x,y,z,r1,r2,h,mat){
+ const m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,8),mat);
+ m.position.set(x,y,z);
+ m.castShadow=true;
+ scene.add(m);
+ return m;
+}
+
+function building(x,z,w,h,d){
+ const y=heightAt(x,z);
+ box(x,y+h/2,z,w,h,d,concrete);
+ box(x,y+h+.1,z,w+.4,.2,d+.4,dark);
+ for(let i=-1;i<=1;i++){
+  box(x+i*w*.28,y+h*.55,z-d/2-.02,w*.13,h*.3,.06,dark);
+ }
+ box(x,y+.8,z+d/2+.04,w*.18,1.6,.1,dark);
+}
+
+function hangar(x,z){
+ const y=heightAt(x,z);
+ box(x,y+3,z,13,6,9,metal);
+ box(x,y+6.1,z,13.4,.3,9.4,dark);
+ box(x,y+2,z+4.55,8,4,.15,dark);
+ for(let i=-1;i<=1;i++){
+  box(x+i*4,y+3,z-4.7,.2,6,.3,orange);
+ }
+}
+
+function rockFormation(x,z,s){
+ const count=4+Math.floor(Math.random()*5);
+ for(let i=0;i<count;i++){
+  const h=s*(.5+Math.random()*1.3);
+  const m=new THREE.Mesh(
+   new THREE.DodecahedronGeometry(s*(.5+Math.random()*.6),1),
+   rock
+  );
+  m.position.set(x+(Math.random()-.5)*s*2,heightAt(x,z)+h*.35,z+(Math.random()-.5)*s*2);
+  m.scale.y=1+Math.random();
+  m.castShadow=true;
+  scene.add(m);
+ }
+}
+
+// Далёкие горы
+for(let i=0;i<32;i++){
+ const a=i/32*Math.PI*2;
+ const r=95+Math.random()*20;
+ const h=15+Math.random()*25;
+ const m=new THREE.Mesh(
+  new THREE.ConeGeometry(10+Math.random()*12,h,5),
+  material(0x827f76)
+ );
+ m.position.set(Math.cos(a)*r,h/2-3,Math.sin(a)*r);
+ m.rotation.y=Math.random()*2;
+ scene.add(m);
+}
+
+// Камни и скалы
+for(let i=0;i<55;i++){
+ const x=(Math.random()-.5)*100;
+ const z=(Math.random()-.5)*100;
+ if(Math.abs(x)<13&&Math.abs(z)<13)continue;
+ rockFormation(x,z,1.5+Math.random()*3);
+}
+
+// Военная база
+building(-15,-8,12,5,9);
+building(16,-12,10,5,8);
+building(-17,17,9,4,8);
+building(18,16,11,5,9);
+hangar(0,-22);
+hangar(-29,0);
+
+// Контейнеры
+for(let i=0;i<12;i++){
+ const x=(Math.random()-.5)*48;
+ const z=(Math.random()-.5)*48;
+ if(Math.abs(x)<12&&Math.abs(z)<12)continue;
+ box(x,heightAt(x,z)+1,z,4,2,2,
+  i%2?orange:metal);
+}
+
+// Дорога
+const road=box(0,heightAt(0,0)+.03,0,7,.08,90,dark);
+road.position.y=-.2;
+
+// Фонарные столбы
+for(const x of [-8,8]){
+ for(const z of [-30,0,30]){
+  cylinder(x,heightAt(x,z)+4,z,.12,.12,8,dark);
+  const lamp=new THREE.PointLight(0xffd79c,1.5,12);
+  lamp.position.set(x,heightAt(x,z)+7,z);
+  scene.add(lamp);
+ }
+}
+
+// Декоративное солнце
+const sunBall=new THREE.Mesh(
+ new THREE.SphereGeometry(4,24,24),
+ new THREE.MeshBasicMaterial({color:0xffe4b0})
+);
+sunBall.position.set(-70,65,-130);
+scene.add(sunBall);
+
+// Энергетические мишени
+const targets=[];
+const targetMat=new THREE.MeshStandardMaterial({
+ color:0x42ffe1,emissive:0x13c9b5,emissiveIntensity:2
 });
-function start(){
- document.getElementById('start').style.display='none';
- started=true;last=performance.now();
- canvas.requestPointerLock();
- requestAnimationFrame(loop);
-}
-document.getElementById('play').onclick=start;
 
-let last=0;
-function loop(now){
- if(!started||ended)return;
- let dt=Math.min((now-last)/1000,.04);last=now;
- update(dt);render();
- requestAnimationFrame(loop);
+function spawnTarget(x,z){
+ const group=new THREE.Group();
+ const sphere=new THREE.Mesh(new THREE.SphereGeometry(.65,20,20),targetMat);
+ const ring=new THREE.Mesh(
+  new THREE.TorusGeometry(.95,.07,8,32),
+  targetMat
+ );
+ group.add(sphere,ring);
+ group.position.set(x,heightAt(x,z)+2.4,z);
+ group.userData={alive:true};
+ scene.add(group);
+ targets.push(group);
 }
+for(let i=0;i<12;i++){
+ spawnTarget((Math.random()-.5)*55,(Math.random()-.5)*55);
+}
+
+// Игрок
+const player={
+ x:0,z:12,y:0,vy:0,yaw:0,pitch:0,grounded:true
+};
+camera.position.set(0,2.7,12);
+
+const keys={};
+let score=0,energy=100,started=false;
+let last=performance.now();
+let firing=false;
+const raycaster=new THREE.Raycaster();
+
+addEventListener('keydown',e=>{
+ keys[e.code]=true;
+ if(e.code==='Space')e.preventDefault();
+});
+addEventListener('keyup',e=>keys[e.code]=false);
+
+renderer.domElement.addEventListener('click',()=>{
+ if(started&&document.pointerLockElement!==renderer.domElement){
+  renderer.domElement.requestPointerLock();
+ }
+});
+
+addEventListener('mousemove',e=>{
+ if(document.pointerLockElement===renderer.domElement){
+  player.yaw-=e.movementX*.002;
+  player.pitch-=e.movementY*.002;
+  player.pitch=Math.max(-1.35,Math.min(1.35,player.pitch));
+ }
+});
+
+function shoot(){
+ if(!started||energy<5)return;
+ energy-=5;
+ document.getElementById('energy').textContent=energy;
+
+ camera.rotation.set(player.pitch,player.yaw,0,'YXZ');
+ raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
+ const live=targets.filter(t=>t.userData.alive);
+ const hits=raycaster.intersectObjects(live,true);
+
+ if(hits.length){
+  let target=hits[0].object;
+  while(target.parent&&!target.userData.alive)target=target.parent;
+  if(target.userData.alive){
+   target.userData.alive=false;
+   scene.remove(target);
+   score+=10;
+   document.getElementById('score').textContent=score;
+   document.getElementById('event').textContent='ЦЕЛЬ ПОРАЖЕНА +10';
+  }
+ }
+}
+
+addEventListener('mousedown',e=>{if(e.button===0)shoot()});
+
 function update(dt){
- let forward=(keys.KeyW?1:0)-(keys.KeyS?1:0);
- let side=(keys.KeyD?1:0)-(keys.KeyA?1:0);
- let a=player.angle;
- let dx=Math.sin(a)*forward+Math.cos(a)*side;
- let dz=Math.cos(a)*forward-Math.sin(a)*side;
- let len=Math.hypot(dx,dz)||1;
- player.x+=dx/len*12*speed*dt;
- player.z+=dz/len*12*speed*dt;
- player.x=Math.max(-22,Math.min(22,player.x));
- player.z=Math.max(-5,Math.min(48,player.z));
- player.vy-=24*gravity*dt;
+ const forward=(keys.KeyW?1:0)-(keys.KeyS?1:0);
+ const side=(keys.KeyD?1:0)-(keys.KeyA?1:0);
+ const sprint=keys.ShiftLeft||keys.ShiftRight;
+ const velocity=sprint?15:9;
+
+ const dx=-Math.sin(player.yaw)*forward+
+ Math.cos(player.yaw)*side;
+ const dz=-Math.cos(player.yaw)*forward-
+ Math.sin(player.yaw)*side;
+ const len=Math.hypot(dx,dz)||1;
+
+ player.x+=dx/len*velocity*dt;
+ player.z+=dz/len*velocity*dt;
+
+ player.x=Math.max(-95,Math.min(95,player.x));
+ player.z=Math.max(-95,Math.min(95,player.z));
+
+ if(keys.Space&&player.grounded){
+  player.vy=10;
+  player.grounded=false;
+ }
+ player.vy-=25*dt;
  player.y+=player.vy*dt;
- if(player.y<0){player.y=0;player.vy=0}
- if(keys.Space&&player.y===0)player.vy=10;
- cores.forEach(c=>{
- if(!c.taken&&Math.hypot(c.x-player.x,c.z-player.z)<1.5){c.taken=true;score+=10;document.getElementById('score').textContent=score}
+
+ const floor=heightAt(player.x,player.z);
+ if(player.y<0){player.y=0;player.vy=0;player.grounded=true}
+
+ camera.position.set(player.x,floor+2.7+player.y,player.z);
+ camera.rotation.set(player.pitch,player.yaw,0,'YXZ');
+
+ targets.forEach(t=>{
+  if(t.userData.alive){
+   t.rotation.y+=dt*.8;
+   t.position.y=heightAt(t.position.x,t.position.z)+2.4+
+   Math.sin(performance.now()*.002+t.position.x)*.3;
+  }
  });
- if(cores.every(c=>c.taken)){
- for(let i=0;i<18;i++)cores.push({x:(Math.random()-.5)*30,z:5+Math.random()*35,taken:false});
- }
- time-=dt;
- document.getElementById('time').textContent=
- '0'+Math.floor(time/60)+':'+String(Math.max(0,Math.ceil(time%60))).padStart(2,'0');
- eventTimer-=dt;
- if(eventTimer<=0){
- eventTimer=30;
- let n=Math.floor(Math.random()*3);
- gravity=n===0?.45:1;
- speed=n===1?1.6:1;
- eventName=['НИЗКАЯ ГРАВИТАЦИЯ','SPEED RUSH','АРЕНА СТАБИЛЬНА'][n];
- document.getElementById('event').textContent=eventName;
- }
- if(time<=0){ended=true;document.getElementById('hint').textContent='МАТЧ ОКОНЧЕН · СЧЁТ '+score;document.exitPointerLock()}
+
+ energy=Math.min(100,energy+dt*2);
+ document.getElementById('energy').textContent=Math.floor(energy);
 }
-function render(){
- ctx.fillStyle='#111d30';ctx.fillRect(0,0,W,H);
- let horizon=H*.43-player.y*18;
- let sky=ctx.createLinearGradient(0,0,0,horizon);
- sky.addColorStop(0,'#080c1b');sky.addColorStop(1,'#19354c');
- ctx.fillStyle=sky;ctx.fillRect(0,0,W,horizon);
- ctx.fillStyle='#101a2a';ctx.fillRect(0,horizon,W,H-horizon);
- let fov=canvas.width*.8;
- function project(x,z){
- let dx=x-player.x,dz=z-player.z;
- let a=player.angle;
- let rx=dx*Math.cos(a)-dz*Math.sin(a);
- let rz=dx*Math.sin(a)+dz*Math.cos(a);
- if(rz<.2)return null;
- return {x:W/2+rx*fov/rz,y:horizon+fov*1.2/rz,scale:fov/rz};
- }
- // floor grid
- ctx.strokeStyle='#24475a';ctx.lineWidth=1;
- for(let z=2;z<55;z+=2){
- let p1=project(-25,z),p2=project(25,z);
- if(p1&&p2){ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke()}
- }
- for(let x=-24;x<=24;x+=3){
- let p1=project(x,2),p2=project(x,55);
- if(p1&&p2){ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke()}
- }
- // arena walls
- for(let x of [-24,24]){
- let p=project(x,25);
- if(p){ctx.fillStyle='#173d51';ctx.fillRect(p.x-3*p.scale,p.y-15*p.scale,6*p.scale,30*p.scale)}
- }
- // cores
- cores.filter(c=>!c.taken).sort((a,b)=>b.z-a.z).forEach(c=>{
- let p=project(c.x,c.z);if(!p||p.scale>900)return;
- let r=Math.max(3,p.scale*.13);
- ctx.save();ctx.shadowBlur=25;ctx.shadowColor='#55ffe0';ctx.fillStyle='#65ffe0';
- ctx.beginPath();ctx.arc(p.x,p.y-r*2,r,0,Math.PI*2);ctx.fill();ctx.restore();
- });
+
+function animate(now){
+ requestAnimationFrame(animate);
+ const dt=Math.min((now-last)/1000,.04);
+ last=now;
+ if(started)update(dt);
+ renderer.render(scene,camera);
 }
+requestAnimationFrame(animate);
+
+document.getElementById('play').onclick=()=>{
+ started=true;
+ document.getElementById('start').style.display='none';
+ renderer.domElement.requestPointerLock();
+};
+
+addEventListener('resize',()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+});
 </script>
 </body>
 </html>
